@@ -38,9 +38,27 @@ class our_method(estiminator):
     # 优化问题：argmax_{beta} l_0(beta)+sum_{k=1}^{K}(l_k(beta,delta[k])-lambda*||delta||_2)*v[k]
     def update_beta(self, delta, v, samples_packs):
         # 对于线性模型，该问题有显式解
-        coef_true = np.zeros(500)
-        coef_true[:20] = 0.3
-        return coef_true#-?
+        # 该显式解为beta=(x0^T*x0+sum_{k=1}^{K}v[k]*xk^T*xk)^{-1}*(x0^T*y0+sum_{k=1}^{K}v[k]*xk^T*yk-sum_{k=1}^{K}v[k]*xk^T*xk*delta[k])
+        # x0,y0为目标模型的样本数据
+        # xk,yk为第k个辅助模型的样本数据
+        
+        #mat1=x0^T*x0+sum_{k=1}^{K}v[k]*xk^T*xk
+        mat1=np.dot(samples_packs[0].getX().T,samples_packs[0].getX())
+        for i in range(len(samples_packs)-1):
+            if v[i]==1:
+                mat1+=np.dot(samples_packs[i+1].getX().T,samples_packs[i+1].getX())
+        #mat2=x0^T*y0+sum_{k=1}^{K}v[k]*xk^T*yk
+        mat2=np.dot(samples_packs[0].getX().T,samples_packs[0].getY())
+        for i in range(len(samples_packs)-1):
+            if v[i]==1:
+                mat2+=np.dot(samples_packs[i+1].getX().T,samples_packs[i+1].getY())
+        #mat3=sum_{k=1}^{K}v[k]*xk^T*xk*delta[k]
+        mat3=np.zeros(len(samples_packs[0].getX()[0]))
+        for i in range(len(samples_packs)-1):
+            if v[i]==1:
+                mat3+=np.dot(samples_packs[i+1].getX().T,np.dot(samples_packs[i+1].getX(),delta[i]))
+        beta=np.dot(np.linalg.inv(mat1),mat2-mat3)
+        return beta
     
     #更新delta
     #输入：beta:当前beta，sample_pack:该模型的样本数据
