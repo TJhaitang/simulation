@@ -1,4 +1,5 @@
 from abc import abstractmethod
+import time
 import numpy as np
 from tqdm import tqdm
 
@@ -91,6 +92,11 @@ class our_method(estiminator):
     def fit(self, samples_packs,s,L):
         # 初始化参数
         # -?第一次迭代时使用全部模型
+        #计算程序运行时间
+        start_time=time.time()
+        times=[]
+        times.append(time.time()-start_time)
+        
         v=np.ones(len(samples_packs)-1)
         # beta为目标模型的回归系数
         beta=np.zeros(len(samples_packs[0].getX()[0]))
@@ -99,19 +105,29 @@ class our_method(estiminator):
         max_iter=10
         for i in tqdm(range(max_iter)):
             # 第一步:交替求解beta与delta
+            if i==0:
+                times.append(time.time()-start_time)
             for j in range(max_iter):
                 beta=self.update_beta(delta,v,samples_packs)
+                if i==0:
+                    times.append(time.time()-start_time)
                 #对K个辅助模型分别更新其delta_k
                 for k in range(len(samples_packs)-1):
                     delta[k]=self.update_delta_k(beta,samples_packs[k+1])
+                if i==0:
+                    times.append(time.time()-start_time)
             # 第二步：更新v
             # 选择delta的q范数最小的L个模型，将其对应的v设为1，其余设为0。
             # 目前选择q=2
+            if i==0:
+                times.append(time.time()-start_time)
             v=np.zeros(len(samples_packs[1:]))
             v[np.argsort(np.linalg.norm(delta,axis=1))[:L]]=1
+            if i==0:
+                times.append(time.time()-start_time)
         # 返回beta
         # -?暂时不设置稀疏度
         self.params=beta
-        return beta,delta,v
+        return beta,delta,v,times
                 
             
