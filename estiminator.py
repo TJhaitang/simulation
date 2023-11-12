@@ -8,7 +8,7 @@ class estiminator:
         self.params=np.zeros(n_features)
     
     @abstractmethod
-    def fit(self, samples_packs):
+    def fit(self, samples_packs,s,L):
         pass
     
     def get_params(self):
@@ -16,12 +16,73 @@ class estiminator:
     
 # 这是一个联合估计器，使用的算法来自Transfer learning for high-dimensional linear regression: Prediction, estimation and minimax optimality
 class trans_lasso(estiminator):
-    def __init__(self):
-        pass
+    def __init__(self, n_features):
+        super(trans_lasso, self).__init__(n_features)
     
-    def fit(self, samples_packs):
-        pass
+    def fit(self, samples_packs,s,L):
+        #Step1-划分训练集与测试集
+        X0=samples_packs[0].getX()
+        y0=samples_packs[0].getY()
+        #按照7:3划分
+        trainX=X0[:int(len(X0)*0.7)]
+        trainy=y0[:int(len(y0)*0.7)]
+        testX=X0[int(len(X0)*0.7):]
+        testy=y0[int(len(y0)*0.7):]
+        #Step2-生成GL下标集合
+        #deltak=1/n_k*sum_{i=1}^{n_k}(x_i^T*y_i)-1/|X_0|*sum_{i=1}^{|X_0|}(x_i^T*y_i)
+        R=[]
+        t_star=20
+        for i in range(len(samples_packs)-1):
+            delta=np.dot(samples_packs[i+1].getX().T,samples_packs[i+1].getY())/len(samples_packs[i+1])-np.dot(trainX.T,trainy)/len(trainX)
+            #将delta的绝对值从大到小排序，取前t_star个，其余置零作为新的delta
+            delta[np.argsort(np.abs(delta))[:-t_star]]=0
+            #delta的2范数的平方作为R
+            R.append(np.linalg.norm(delta)**2)
+        #从R中找出最小的L个元素对应的下标，作为GL的下标集合
+        GL=np.argsort(R)[:L]
+        #Step3-在GL中使用前1个、前2个、...、前L个模型分别进行Oracle Trans Lasso进行估计，获得beta1、beta2、...、betaL
+        #Oracle Trans Lasso: 进行两步lasso估计
+        #第一步：在所有的辅助模型中使用lasso进行估计，获得回归系数w
+        #第二步：在目标模型中使用lasso进行估计，惩罚项为beta-w
+        #这里使用sklearn中的lasso进行估计
+        from sklearn.linear_model import Lasso
+        beta=[]
+        for i in range(L):
+            G=GL[:i+1]
+            #第一步，在下标为G的辅助模型上同时使用lasso
+            lasso=Lasso(alpha=0.1)
+            infoX=[]
+            infoy=[]
+            for j in range(len(G)):
+                infoX.append(samples_packs[G[j]+1].getX())
+                infoy.append(samples_packs[G[j]+1].getY())
+            infoX=np.concatenate(infoX)
+            infoy=np.concatenate(infoy)
+            lasso.fit(infoX,infoy)
+            w=lasso.coef_
+            #第二步，在目标模型上使用lasso估计beta，但惩罚项为beta-w
+            lasso=Lasso(alpha=0.1)
+            trainy=trainy-np.dot(trainX,w)
+            lasso.fit(trainX,trainy)
+            beta.append(lasso.coef_)
+        #Step4-使用beta1、beta2、...、betaL进行估计，获得beta
+        #选择在测试集上表现最好的beta作为最终的beta
+        from sklearn.metrics import mean_squared_error
+        min_error=mean_squared_error(testy,np.dot(testX,beta[0]))
+        min_index=0
+        for i in range(L):
+            error=mean_squared_error(testy,np.dot(testX,beta[i]))
+            if error<min_error:
+                min_error=error
+                min_index=i
+        self.params=beta[min_index]
+        return beta[min_index],GL
+            
+        
 
+
+
+# 
 class our_method(estiminator):
     def __init__(self, n_features):
         super(our_method, self).__init__(n_features)
