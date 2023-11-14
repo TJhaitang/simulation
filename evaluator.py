@@ -68,7 +68,7 @@ class evaluator:
                 delta[:]=0.01*i
                 coef=coef_true+delta
                 noise_mean = 0
-                noise_var = 0.1
+                noise_var = 1
                 X, y = coef_gen(coef, cov, noise_mean, noise_var, self.n_samples)
                 samples_packs.append(samples_pack(X, y))
             self.samples_packs=samples_packs
