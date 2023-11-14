@@ -6,6 +6,7 @@ from tqdm import tqdm
 class estiminator:
     def __init__(self,n_features):
         self.params=np.zeros(n_features)
+        self.n_features=n_features
     
     @abstractmethod
     def fit(self, samples_packs,s,L):
@@ -14,11 +15,34 @@ class estiminator:
     def get_params(self):
         return self.params
     
+    
+# 该估计器仅使用目标模型的样本数据进行lasso估计
+class t_lasso(estiminator):
+    def __init__(self, n_features):
+        super(t_lasso,self).__init__(n_features)
+        
+    def fit(self,samples_packs,s,L):
+        from sklearn.linear_model import Lasso
+        lambda1=0.01
+        X=samples_packs[0].getX()
+        y=samples_packs[0].getY()
+        lasso=Lasso(alpha=lambda1)
+        lasso.fit(X,y)
+        #保留绝对值前s大个-?有意义吗？
+        lasso.coef_[np.argsort(np.abs(lasso.coef_))[:-s]] = 0
+        self.params=lasso.coef_
+        return lasso.coef_
+    
 # 这是一个联合估计器，使用的算法来自Transfer learning for high-dimensional linear regression: Prediction, estimation and minimax optimality
 class trans_lasso(estiminator):
     def __init__(self, n_features):
         super(trans_lasso, self).__init__(n_features)
     
+    #关于lambda的选择问题，原始论文中是这样进行的：
+    #R:
+    #cv.init<-cv.glmnet(X[ind.kA,], y.A, nfolds=8, lambda=seq(1,0.1,length.out=10)*sqrt(2*log(p)/length(ind.kA)))
+    #lam.const <- cv.init$lambda.min/sqrt(2*log(p)/length(ind.kA))
+    #lambda=lam.const*sqrt(2*log(p)/length(ind.kA)))$beta
     def fit(self, samples_packs,s,L):
         #Step1-划分训练集与测试集
         X0=samples_packs[0].getX()
@@ -50,21 +74,24 @@ class trans_lasso(estiminator):
         for i in range(L):
             G=GL[:i+1]
             #第一步，在下标为G的辅助模型上同时使用lasso
-            lasso=Lasso(alpha=0.1)
+            lasso=Lasso(alpha=0.01)
             infoX=[]
             infoy=[]
             for j in range(len(G)):
                 infoX.append(samples_packs[G[j]+1].getX())
+                # print(samples_packs[G[j]+1].getX().shape)
                 infoy.append(samples_packs[G[j]+1].getY())
             infoX=np.concatenate(infoX)
             infoy=np.concatenate(infoy)
+            # print(infoX.shape,infoy.shape)
             lasso.fit(infoX,infoy)
             w=lasso.coef_
+            assert len(w)==self.n_features
             #第二步，在目标模型上使用lasso估计beta，但惩罚项为beta-w
-            lasso=Lasso(alpha=0.1)
-            trainy=trainy-np.dot(trainX,w)
-            lasso.fit(trainX,trainy)
-            beta.append(lasso.coef_)
+            lasso=Lasso(alpha=0.01)
+            trainyL=trainy-np.dot(trainX,w)
+            lasso.fit(trainX,trainyL)
+            beta.append(lasso.coef_+w)
         #Step4-使用beta1、beta2、...、betaL进行估计，获得beta
         #选择在测试集上表现最好的beta作为最终的beta
         from sklearn.metrics import mean_squared_error
@@ -75,13 +102,13 @@ class trans_lasso(estiminator):
             if error<min_error:
                 min_error=error
                 min_index=i
+        #Step5-取绝对值前s大
+        beta[min_index][np.argsort(np.abs(beta[min_index]))[:-s]] = 0  
         self.params=beta[min_index]
+        assert len(self.params)==self.n_features
         return beta[min_index],GL
             
         
-
-
-
 # 
 class our_method(estiminator):
     def __init__(self, n_features):
@@ -129,7 +156,7 @@ class our_method(estiminator):
         # 对于线性模型，这里是delta的岭回归解-?关于delta的惩罚项，ppt里面是2范数，这里先用2范数的平方了
         # 该显示解delta=(X^T*X-lambda*I)^{-1}*X^T*(y-X*beta)
         # 关于lambda的取值问题该怎么解决呢？-?这里先假定lambda=1
-        lamb=1
+        lamb=0.001
         X=sample_pack.getX()
         y=sample_pack.getY()
         delta=np.dot(np.linalg.inv(np.dot(X.T,X)-lamb*np.eye(len(X[0]))),np.dot(X.T,y)-np.dot(X.T,np.dot(X,beta)))
@@ -152,7 +179,7 @@ class our_method(estiminator):
     # 输入：samples_packs:样本数据，s:目标模型稀疏度，L:选定的辅助模型个数
     def fit(self, samples_packs,s,L):
         # 初始化参数
-        # -?第一次迭代时使用全部模型
+        # -?第一次迭代时使用全部模型,v=[1,1,1,1,...]
         #计算程序运行时间
         start_time=time.time()
         times=[]
@@ -164,12 +191,20 @@ class our_method(estiminator):
         delta=np.zeros((len(samples_packs)-1,len(samples_packs[0].getX()[0])))
         # 迭代求解
         max_iter=10
-        for i in tqdm(range(max_iter)):
+        # 设置算法的退出阈值threshold
+        threshold=0.001
+        beta1=np.ones(len(samples_packs[0].getX()[0]))
+        beta2=np.ones(len(samples_packs[0].getX()[0]))
+        for i in range(max_iter):
             # 第一步:交替求解beta与delta
             if i==0:
                 times.append(time.time()-start_time)
             for j in range(max_iter):
                 beta=self.update_beta(delta,v,samples_packs)
+                #计算beta与beta2的差的2范数
+                if np.linalg.norm(beta-beta2)<threshold:
+                    break
+                beta2=beta
                 if i==0:
                     times.append(time.time()-start_time)
                 #对K个辅助模型分别更新其delta_k
@@ -177,6 +212,9 @@ class our_method(estiminator):
                     delta[k]=self.update_delta_k(beta,samples_packs[k+1])
                 if i==0:
                     times.append(time.time()-start_time)
+            if np.linalg.norm(beta-beta1)<threshold:
+                break
+            beta1=beta
             # 第二步：更新v
             # 选择delta的q范数最小的L个模型，将其对应的v设为1，其余设为0。
             # 目前选择q=2
@@ -187,7 +225,9 @@ class our_method(estiminator):
             if i==0:
                 times.append(time.time()-start_time)
         # 返回beta
-        # -?暂时不设置稀疏度
+        # -?暂时不设置稀疏度-?设置了一下
+        #保留绝对值前s大个
+        beta[np.argsort(np.abs(beta))[:-s]] = 0
         self.params=beta
         return beta,delta,v,times
                 
