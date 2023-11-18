@@ -3,6 +3,7 @@
 # 联合估计器的输入是来自于K+1个不同线性模型的观测数据，其中包括一个目标模型与K个辅助模型。输出是估计目标模型的参数
 # 这K+1个模型使用相同的特征，但其样本的分布、噪声的分布、模型的参数都可能不同，特征之间的相关性也可能不同
 
+import time
 import numpy as np
 import random
 
@@ -34,7 +35,7 @@ class samples_pack:
         return self.y
 
 class evaluator:
-    def __init__(self,n_features, n_packs, n_samples, s, L) -> None:
+    def __init__(self,n_features, n_packs, n_samples, s, L,repeat_times=1) -> None:
         self.n_packs=n_packs
         self.n_samples=n_samples
         self.n_features=n_features
@@ -42,13 +43,25 @@ class evaluator:
         self.L=L
         self.samples_packs=None
         self.method=None
+        self.repeat_times=repeat_times
         
     # 独立估计器：特征间的相关性为0，噪声的分布相同，模型参数不同
     # 暂时不考虑模型样本的数量均衡性，默认全部相同
     
-    def eval(self, estiminator, sample_packs):
-        estiminator.fit(sample_packs,self.s,self.L)
-        return estiminator.get_params()
+    def eval(self, estiminator, sample_packs,coef_true):
+        #计时
+        SSE_list=[]
+        time_list=[]
+        for i in range(self.repeat_times):
+            start=time.time()
+            estiminator.fit(sample_packs,self.s,self.L)
+            end=time.time()
+            time_list.append(end-start)
+            SSE=np.sum((coef_true-estiminator.get_params())**2)
+            SSE_list.append(SSE)
+        SSE=np.mean(SSE_list)
+        time=np.mean(time_list)
+        return coef_true,SSE,time
     
     # n_packs为辅助模型数量+1（目标模型）
     # 将目标模型的samples_pack置于列表第一
@@ -56,7 +69,7 @@ class evaluator:
     def indep_eval(self, estiminator,refresh=False):
         coef_true = np.zeros(self.n_features)
         coef_true[:self.s] = 0.3
-        if refresh or self.samples_packs==None:
+        if refresh or self.samples_packs==None or self.method!='indep':
             samples_packs=[]
             # 设定超参数：各模型回归系数、特征间的协方差矩阵、噪声的均值与方差
             # 长度为n_features, 其中前s个为非零回归系数，后n_features-s个为零
@@ -72,16 +85,15 @@ class evaluator:
                 X, y = coef_gen(coef, cov, noise_mean, noise_var, self.n_samples)
                 samples_packs.append(samples_pack(X, y))
             self.samples_packs=samples_packs
+            self.method='indep'
         #模型拟合
-        pre_params = self.eval(estiminator, self.samples_packs)
-        #计算coef_true与pre_params的SSE
-        SSE = np.sum((coef_true - pre_params)**2)
-        return SSE
+        return self.eval(estiminator, self.samples_packs,coef_true)
+
     
     def t12_eval(self,estiminator,h,refresh=False):
         coef_true = np.zeros(self.n_features)
         coef_true[:self.s] = 0.3
-        if refresh or self.samples_packs==None or self.method!='t11':
+        if refresh or self.samples_packs==None or self.method!='t12':
             samples_packs=[]
             # 设定超参数：各模型回归系数、特征间的协方差矩阵、噪声的均值与方差
             # 长度为n_features, 其中前s个为非零回归系数，后n_features-s个为零
@@ -102,17 +114,14 @@ class evaluator:
                 X, y = coef_gen(coef, cov, noise_mean, noise_var, self.n_samples)
                 samples_packs.append(samples_pack(X, y))
             self.samples_packs=samples_packs
-            self.method='t11'
+            self.method='t12'
         #模型拟合
-        pre_params = self.eval(estiminator, self.samples_packs)
-        #计算coef_true与pre_params的SSE
-        SSE = np.sum((coef_true - pre_params)**2)
-        return SSE
+        return self.eval(estiminator, self.samples_packs,coef_true)
     
     def t22_eval(self,estiminator,h,refresh=False):
         coef_true = np.zeros(self.n_features)
         coef_true[:self.s] = 0.3
-        if refresh or self.samples_packs==None or self.method!='t21':
+        if refresh or self.samples_packs==None or self.method!='t22':
             samples_packs=[]
             # 设定超参数：各模型回归系数、特征间的协方差矩阵、噪声的均值与方差
             # 长度为n_features, 其中前s个为非零回归系数，后n_features-s个为零
@@ -154,17 +163,14 @@ class evaluator:
                 X, y = coef_gen(coef, cov, noise_mean, noise_var, self.n_samples)
                 samples_packs.append(samples_pack(X, y))
             self.samples_packs=samples_packs
-            self.method='t21'
+            self.method='t22'
         #模型拟合
-        pre_params = self.eval(estiminator, self.samples_packs)
-        #计算coef_true与pre_params的SSE
-        SSE = np.sum((coef_true - pre_params)**2)
-        return SSE
+        return self.eval(estiminator, self.samples_packs,coef_true)
     
     def t32_eval(self,estiminator,h,refresh=False):
         coef_true = np.zeros(self.n_features)
         coef_true[:self.s] = 0.3
-        if refresh or self.samples_packs==None or self.method!='t21':
+        if refresh or self.samples_packs==None or self.method!='t32':
             samples_packs=[]
             # 设定超参数：各模型回归系数、特征间的协方差矩阵、噪声的均值与方差
             # 长度为n_features, 其中前s个为非零回归系数，后n_features-s个为零
@@ -198,12 +204,9 @@ class evaluator:
                 X, y = coef_gen(coef, cov, noise_mean, noise_var, self.n_samples)
                 samples_packs.append(samples_pack(X, y))
             self.samples_packs=samples_packs
-            self.method='t21'
+            self.method='t32'
         #模型拟合
-        pre_params = self.eval(estiminator, self.samples_packs)
-        #计算coef_true与pre_params的SSE
-        SSE = np.sum((coef_true - pre_params)**2)
-        return SSE
+        return self.eval(estiminator, self.samples_packs,coef_true)
     
     def t11_eval(self,estiminator,h,refresh=False):
         coef_true = np.zeros(self.n_features)
@@ -233,10 +236,7 @@ class evaluator:
             self.samples_packs=samples_packs
             self.method='t11'
         #模型拟合
-        pre_params = self.eval(estiminator, self.samples_packs)
-        #计算coef_true与pre_params的SSE
-        SSE = np.sum((coef_true - pre_params)**2)
-        return SSE
+        return self.eval(estiminator, self.samples_packs,coef_true)
     
     def t21_eval(self,estiminator,h,refresh=False):
         coef_true = np.zeros(self.n_features)
@@ -286,15 +286,12 @@ class evaluator:
             self.samples_packs=samples_packs
             self.method='t21'
         #模型拟合
-        pre_params = self.eval(estiminator, self.samples_packs)
-        #计算coef_true与pre_params的SSE
-        SSE = np.sum((coef_true - pre_params)**2)
-        return SSE
+        return self.eval(estiminator, self.samples_packs,coef_true)
     
     def t31_eval(self,estiminator,h,refresh=False):
         coef_true = np.zeros(self.n_features)
         coef_true[:self.s] = 0.3
-        if refresh or self.samples_packs==None or self.method!='t21':
+        if refresh or self.samples_packs==None or self.method!='t31':
             samples_packs=[]
             # 设定超参数：各模型回归系数、特征间的协方差矩阵、噪声的均值与方差
             # 长度为n_features, 其中前s个为非零回归系数，后n_features-s个为零
@@ -329,9 +326,6 @@ class evaluator:
                 X, y = coef_gen(coef, cov, noise_mean, noise_var, self.n_samples)
                 samples_packs.append(samples_pack(X, y))
             self.samples_packs=samples_packs
-            self.method='t21'
+            self.method='t31'
         #模型拟合
-        pre_params = self.eval(estiminator, self.samples_packs)
-        #计算coef_true与pre_params的SSE
-        SSE = np.sum((coef_true - pre_params)**2)
-        return SSE
+        return self.eval(estiminator, self.samples_packs,coef_true)

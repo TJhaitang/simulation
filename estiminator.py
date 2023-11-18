@@ -2,6 +2,7 @@ from abc import abstractmethod
 import time
 import numpy as np
 from tqdm import tqdm
+from sklearn.linear_model import Lasso
 
 class estiminator:
     def __init__(self,n_features):
@@ -69,7 +70,6 @@ class trans_lasso(estiminator):
         #第一步：在所有的辅助模型中使用lasso进行估计，获得回归系数w
         #第二步：在目标模型中使用lasso进行估计，惩罚项为beta-w
         #这里使用sklearn中的lasso进行估计
-        from sklearn.linear_model import Lasso
         beta=[]
         for i in range(L):
             G=GL[:i+1]
@@ -110,9 +110,9 @@ class trans_lasso(estiminator):
             
         
 # 
-class our_method(estiminator):
+class our_method_highdim(estiminator):
     def __init__(self, n_features):
-        super(our_method, self).__init__(n_features)
+        super(our_method_highdim, self).__init__(n_features)
       
     #这个方法没有用到，目的是方便使用梯度下降等方法，将更新方法放到模型里面去  
     def likelihood(self, beta, delta, samples_pack):
@@ -125,7 +125,7 @@ class our_method(estiminator):
     #更新beta
     #输入：delta:辅助模型与目标模型的回归系数差矩阵，v:辅助模型是否被选择的向量，samples_packs:样本数据
     # 优化问题：argmax_{beta} l_0(beta)+sum_{k=1}^{K}(l_k(beta,delta[k])-lambda*||delta||_2)*v[k]
-    def update_beta(self, delta, v, samples_packs):
+    def update_beta(self, delta, v, samples_packs):#加入了l1正则
         # 对于线性模型，该问题有显式解
         # 该显式解为beta=(x0^T*x0+sum_{k=1}^{K}v[k]*xk^T*xk)^{-1}*(x0^T*y0+sum_{k=1}^{K}v[k]*xk^T*yk-sum_{k=1}^{K}v[k]*xk^T*xk*delta[k])
         # x0,y0为目标模型的样本数据
@@ -152,7 +152,7 @@ class our_method(estiminator):
     #更新delta
     #输入：beta:当前beta，sample_pack:该模型的样本数据
     #输出：更新后的delta_k
-    def update_delta_k(self,beta,sample_pack):
+    def update_delta_k(self,beta,sample_pack):#修改为2范数不平方    
         # 对于线性模型，这里是delta的岭回归解-?关于delta的惩罚项，ppt里面是2范数，这里先用2范数的平方了
         # 该显示解delta=(X^T*X-lambda*I)^{-1}*X^T*(y-X*beta)
         # 关于lambda的取值问题该怎么解决呢？-?这里先假定lambda=1
