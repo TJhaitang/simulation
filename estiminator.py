@@ -16,6 +16,20 @@ class estiminator:
     def get_params(self):
         return self.params
     
+
+class our_method(estiminator):
+    def __init__(self, n_features):
+        super(our_method, self).__init__(n_features)
+
+    def fit(self, samples_packs, s, L):
+        return super().fit(samples_packs, s, L)
+
+class trans_lasso_lowdim(estiminator):
+    def __init__(self, n_features):
+        super(trans_lasso_lowdim,self).__init__(n_features)
+
+    def fit(self, samples_packs, s, L):
+        return super().fit(samples_packs, s, L)
     
 # 该估计器仅使用目标模型的样本数据进行lasso估计
 class t_lasso(estiminator):
