@@ -16,20 +16,6 @@ class estiminator:
     def get_params(self):
         return self.params
     
-
-class our_method(estiminator):
-    def __init__(self, n_features):
-        super(our_method, self).__init__(n_features)
-
-    def fit(self, samples_packs, s, L):
-        return super().fit(samples_packs, s, L)
-
-class trans_lasso_lowdim(estiminator):
-    def __init__(self, n_features):
-        super(trans_lasso_lowdim,self).__init__(n_features)
-
-    def fit(self, samples_packs, s, L):
-        return super().fit(samples_packs, s, L)
     
 # 该估计器仅使用目标模型的样本数据进行lasso估计
 class t_lasso(estiminator):
@@ -60,6 +46,14 @@ class trans_lasso(estiminator):
     #lambda=lam.const*sqrt(2*log(p)/length(ind.kA)))$beta
     def fit(self, samples_packs,s,L):
         #Step1-划分训练集与测试集
+        model_num=len(samples_packs)-1
+        if model_num==0:
+            #直接lasso
+            lasso=Lasso(alpha=0.01)
+            lasso.fit(samples_packs[0].getX(),samples_packs[0].getY())
+            #保留绝对值前s大个-?有意义吗？
+            self.params=lasso.coef_
+            return lasso.coef_,[],[],[]
         X0=samples_packs[0].getX()
         y0=samples_packs[0].getY()
         #按照7:3划分
@@ -117,16 +111,16 @@ class trans_lasso(estiminator):
                 min_error=error
                 min_index=i
         #Step5-取绝对值前s大
-        beta[min_index][np.argsort(np.abs(beta[min_index]))[:-s]] = 0  
+        # beta[min_index][np.argsort(np.abs(beta[min_index]))[:-s]] = 0  
         self.params=beta[min_index]
         assert len(self.params)==self.n_features
         return beta[min_index],GL
             
         
 # 
-class our_method_highdim(estiminator):
+class our_method(estiminator):
     def __init__(self, n_features):
-        super(our_method_highdim, self).__init__(n_features)
+        super(our_method, self).__init__(n_features)
       
     #这个方法没有用到，目的是方便使用梯度下降等方法，将更新方法放到模型里面去  
     def likelihood(self, beta, delta, samples_pack):
@@ -139,14 +133,16 @@ class our_method_highdim(estiminator):
     #更新beta
     #输入：delta:辅助模型与目标模型的回归系数差矩阵，v:辅助模型是否被选择的向量，samples_packs:样本数据
     # 优化问题：argmax_{beta} l_0(beta)+sum_{k=1}^{K}(l_k(beta,delta[k])-lambda*||delta||_2)*v[k]
-    def update_beta(self, delta, v, samples_packs):#加入了l1正则
+    def update_beta(self, delta, v, samples_packs):#加入了l2正则-?
         # 对于线性模型，该问题有显式解
-        # 该显式解为beta=(x0^T*x0+sum_{k=1}^{K}v[k]*xk^T*xk)^{-1}*(x0^T*y0+sum_{k=1}^{K}v[k]*xk^T*yk-sum_{k=1}^{K}v[k]*xk^T*xk*delta[k])
+        # 该显式解为beta=(x0^T*x0+sum_{k=1}^{K}v[k]*xk^T*xk-lambda*E)^{-1}*(x0^T*y0+sum_{k=1}^{K}v[k]*xk^T*yk-sum_{k=1}^{K}v[k]*xk^T*xk*delta[k])
         # x0,y0为目标模型的样本数据
         # xk,yk为第k个辅助模型的样本数据
         
-        #mat1=x0^T*x0+sum_{k=1}^{K}v[k]*xk^T*xk
+        #mat1=x0^T*x0+sum_{k=1}^{K}v[k]*xk^T*xk-lambda*E
+        lamb=0.001
         mat1=np.dot(samples_packs[0].getX().T,samples_packs[0].getX())
+        mat1-=lamb*np.eye(len(samples_packs[0].getX()[0]))
         for i in range(len(samples_packs)-1):
             if v[i]==1:
                 mat1+=np.dot(samples_packs[i+1].getX().T,samples_packs[i+1].getX())
@@ -192,6 +188,14 @@ class our_method_highdim(estiminator):
     # -?没有设置收敛条件，目前仅仅设置了最大迭代次数
     # 输入：samples_packs:样本数据，s:目标模型稀疏度，L:选定的辅助模型个数
     def fit(self, samples_packs,s,L):
+        #如果model_num==0,则直接使用目标模型的样本数据进行lasso估计
+        model_num=len(samples_packs)-1
+        if model_num==0:
+            lasso=Lasso(alpha=0.01)
+            lasso.fit(samples_packs[0].getX(),samples_packs[0].getY())
+            #保留绝对值前s大个-?有意义吗？
+            self.params=lasso.coef_
+            return lasso.coef_,[],[],[]
         # 初始化参数
         # -?第一次迭代时使用全部模型,v=[1,1,1,1,...]
         #计算程序运行时间
@@ -241,8 +245,6 @@ class our_method_highdim(estiminator):
         # 返回beta
         # -?暂时不设置稀疏度-?设置了一下
         #保留绝对值前s大个
-        beta[np.argsort(np.abs(beta))[:-s]] = 0
+        # beta[np.argsort(np.abs(beta))[:-s]] = 0
         self.params=beta
         return beta,delta,v,times
-                
-            

@@ -59,9 +59,9 @@ class evaluator:
             time_list.append(end-start)
             SSE=np.sum((coef_true-estiminator.get_params())**2)
             SSE_list.append(SSE)
-        SSE=np.mean(SSE_list)
-        time=np.mean(time_list)
-        return coef_true,SSE,time
+        SSE_mean=np.mean(SSE_list)
+        time_mean=np.mean(time_list)
+        return coef_true,SSE_mean,time_mean
     
     # n_packs为辅助模型数量+1（目标模型）
     # 将目标模型的samples_pack置于列表第一
@@ -78,7 +78,7 @@ class evaluator:
                 cov = np.eye(self.n_features)
                 delta = np.zeros(self.n_features)
                 #delta=e*i*0.01
-                delta[:]=0.01*i
+                # delta[:]=0.01*i
                 coef=coef_true+delta
                 noise_mean = 0
                 noise_var = 1
