@@ -226,7 +226,7 @@ class evaluator:
                     random_list=random.sample(range(self.n_features),h)
                     delta[random_list]=-0.3
                 else:
-                    random_list=random.sample(range(self.n_features),2*self.s)
+                    random_list=random.sample(range(self.n_features),int(self.s/2))
                     delta[random_list]=-0.5
                 coef=coef_true+delta
                 noise_mean = 0
