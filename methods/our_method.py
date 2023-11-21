@@ -31,7 +31,7 @@ class Our_method(estiminator):
         #mat1=x0^T*x0+sum_{k=1}^{K}v[k]*xk^T*xk-lambda*E
         lamb=0.001
         mat1=np.dot(samples_packs[0].getX().T,samples_packs[0].getX())
-        mat1-=lamb*np.eye(len(samples_packs[0].getX()[0]))
+        # mat1-=lamb*np.eye(len(samples_packs[0].getX()[0]))
         for i in range(len(samples_packs)-1):
             if v[i]==1:
                 mat1+=np.dot(samples_packs[i+1].getX().T,samples_packs[i+1].getX())
@@ -56,26 +56,30 @@ class Our_method(estiminator):
         # 该问题好像没有显式解，但函数是凸函数，可以使用梯度下降法求解
         # 目标函数在0处不可导
         # -?先比较lambda与||X.T*y||_2的大小，如果lambda大，则delta_k=0
-        # -?否则，使用梯度下降法求解，初始值设置为岭回归的解（感觉有些奇怪，感觉还是没能完全理解这个算法）
-        # -?岭回归的解为beta=inv(X.T*X+lambda*E)*X.T*y
-        lamb=0.001#-?
+        # -?使用IHT迭代算法求解
+        lamb=1#-?
         X=sample_pack.getX()
         y=sample_pack.getY()
-        y=y-np.dot(X,beta)
+        y=y-np.dot(X,beta)#优化delta
         if lamb>np.linalg.norm(np.dot(X.T,y)):
             return np.zeros(len(X[0]))
         else:
+            #使用IHT方法迭代求解
+            #先测试一下
+            Lipschitz=1
+            max_iter=100
+            #岭回归结果作为初值
             delta=np.dot(np.linalg.inv(np.dot(X.T,X)+lamb*np.eye(len(X[0]))),np.dot(X.T,y))
-            # 做梯度下降
-            # -?每一步做线性搜索，搜索步长为0.01
-            # -?梯度为2*X.T*(X*delta_k-y)+lambda*delta_k/||delta_k||_2
-            # -?梯度下降的终止条件为梯度的2范数小于0.001
-            # -？先这么写吧，讨论班的时候再请教一下
-            grad=2*np.dot(X.T,np.dot(X,delta)-y)+lamb*delta/np.linalg.norm(delta)
-            step=0.01
-            while np.linalg.norm(grad)>0.001:
-                delta=delta-step*grad
-                grad=2*np.dot(X.T,np.dot(X,delta)-y)+lamb*delta/np.linalg.norm(delta)
+            delta2=delta+0
+            for i in range(max_iter):
+                #计算梯度
+                grad=2*np.dot(X.T,np.dot(X,delta)-y)
+                b=delta-1/Lipschitz*grad
+                assert 2*lamb/Lipschitz<np.linalg.norm(b)#初始条件保证不可能进这里
+                delta=(1-2*lamb/(Lipschitz*np.linalg.norm(b)))*b
+                if np.linalg.norm(delta-delta2)<0.0001:
+                    break
+                delta2=delta
             return delta
         
     
