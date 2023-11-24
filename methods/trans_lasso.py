@@ -4,20 +4,24 @@ from sklearn.linear_model import Lasso
 import time
 
 # 这是一个联合估计器，使用的算法来自Transfer learning for high-dimensional linear regression: Prediction, estimation and minimax optimality
-class trans_lasso(estiminator):
+class Trans_lasso(estiminator):
     def __init__(self, n_features=0,s=0,L=0,instance=None):
         if instance is not None:
-            super(trans_lasso, self).__init__(instance.n_features,instance.s,instance.L)
+            super(Trans_lasso, self).__init__(instance.n_features,instance.s,instance.L)
         else:
             assert n_features>0 and s>0 and L>0
-            super(trans_lasso, self).__init__(n_features,s,L)
+            super(Trans_lasso, self).__init__(n_features,s,L)
     
     #关于lambda的选择问题，原始论文中是这样进行的：
     #R:
     #cv.init<-cv.glmnet(X[ind.kA,], y.A, nfolds=8, lambda=seq(1,0.1,length.out=10)*sqrt(2*log(p)/length(ind.kA)))
     #lam.const <- cv.init$lambda.min/sqrt(2*log(p)/length(ind.kA))
     #lambda=lam.const*sqrt(2*log(p)/length(ind.kA)))$beta
-    def fit(self, samples_packs):
+    def fit(self, samples_packs,s=0,L=0):
+        if s==0:
+            s=self.s
+        if L==0:
+            L=self.L
         #Step1-划分训练集与测试集
         model_num=len(samples_packs)-1
         if model_num==0:

@@ -57,26 +57,29 @@ class Our_method(estiminator):
         # 目标函数在0处不可导
         # -?先比较lambda与||X.T*y||_2的大小，如果lambda大，则delta_k=0
         # -?使用IHT迭代算法求解
-        lamb=1#-?
+        lamb=0.1#-?
         X=sample_pack.getX()
         y=sample_pack.getY()
         y=y-np.dot(X,beta)#优化delta
-        if lamb>np.linalg.norm(np.dot(X.T,y)):
+        if lamb>=np.linalg.norm(np.dot(X.T,y)):
             return np.zeros(len(X[0]))
         else:
             #使用IHT方法迭代求解
             #先测试一下
-            Lipschitz=1
+            #L是X的最大奇异值
+            U,sigma,VT=np.linalg.svd(X)
+            Lipschitz=sigma[0]*sigma[0]
+            # print(Lipschitz)
             max_iter=100
             #岭回归结果作为初值
             delta=np.dot(np.linalg.inv(np.dot(X.T,X)+lamb*np.eye(len(X[0]))),np.dot(X.T,y))
             delta2=delta+0
             for i in range(max_iter):
                 #计算梯度
-                grad=2*np.dot(X.T,np.dot(X,delta)-y)
+                grad=np.dot(X.T,np.dot(X,delta)-y)
                 b=delta-1/Lipschitz*grad
-                assert 2*lamb/Lipschitz<np.linalg.norm(b)#初始条件保证不可能进这里
-                delta=(1-2*lamb/(Lipschitz*np.linalg.norm(b)))*b
+                # assert 2*lamb/Lipschitz<np.linalg.norm(b)#初始条件保证不可能进这里
+                delta=(1-lamb/(Lipschitz*np.linalg.norm(b)))*b
                 if np.linalg.norm(delta-delta2)<0.0001:
                     break
                 delta2=delta

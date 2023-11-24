@@ -12,7 +12,7 @@ class estiminator:
         self.L=L
     
     @abstractmethod
-    def fit(self, samples_packs):
+    def fit(self, samples_packs,s=0,L=0):
         pass
     
     def get_params(self):

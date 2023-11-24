@@ -4,15 +4,15 @@ from sklearn.linear_model import Lasso
 import time
 
 # 该估计器仅使用目标模型的样本数据进行lasso估计
-class t_lasso(estiminator):
+class T_lasso(estiminator):
     def __init__(self, n_features=0,s=0,L=0,instance=None):
         if instance is not None:
-            super(t_lasso, self).__init__(instance.n_features,instance.s,instance.L)
+            super(T_lasso, self).__init__(instance.n_features,instance.s,instance.L)
         else:
             assert n_features>0 and s>0 and L>0
-            super(t_lasso, self).__init__(n_features,s,L)
+            super(T_lasso, self).__init__(n_features,s,L)
         
-    def fit(self,samples_packs):
+    def fit(self,samples_packs,s=0,L=0):
         from sklearn.linear_model import Lasso
         lambda1=0.01
         X=samples_packs[0].getX()

@@ -12,6 +12,10 @@ class evaluator:
         self.repeat_times=repeat_times
         self.task_queue=[]
         self.result_list=[]
+        self.count=0
+        
+    def __task_len__(self):
+        return len(self.task_queue)
     
     # 对给定的算法、样本数据、真实参数进行一次评估
     def eval(self, estiminator, sample_packs,coef_true,s,L,index=None):
@@ -20,12 +24,11 @@ class evaluator:
         estiminator.fit(sample_packs,s,L)
         end=time.time()
         SSE=np.sum((coef_true-estiminator.get_params())**2)
+        # print(index)
         #将结果输出到result_list中
-        if index!=None:
-            self.result_list[index]=(end-start,SSE)
-        return end-start,SSE
+        return end-start,SSE,index
     
-    def append(self,method,samples_packs,coef_true,s,L,repeat=False):
+    def append(self,method,samples_packs,coef_true,s,L,repeat=False):#-?重复的逻辑写错了，以后有缘修改一下
         if repeat:
             for i in range(self.repeat_times):
                 self.task_queue.append((method,samples_packs,coef_true,s,L,len(self.task_queue)))
@@ -41,10 +44,14 @@ class evaluator:
             pool.apply_async(self.eval,task,callback=self.callback)
         pool.close()
         pool.join()
-        return self.result_list
     
     def callback(self,result):
-        pass 
-            
+        times,SSE,index=result
+        self.result_list[index]=SSE
+        self.count+=1
+        print(str(self.count)+'/'+str(len(self.task_queue)))
+        
+    def get_result(self):
+        return 0
 
 
