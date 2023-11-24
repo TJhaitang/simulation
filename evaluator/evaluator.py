@@ -8,17 +8,23 @@ import numpy as np
 
 #加入了多线程的评估器，
 class evaluator:
-    def __init__(self,repeat_times=1) -> None:
+    def __init__(self,repeat_times=1,model_num=1) -> None:
         self.repeat_times=repeat_times
         self.task_queue=[]
+        for i in range(model_num):
+            self.task_queue.append([])
         self.result_list=[]
         self.count=0
+        self.model_num=model_num
         
     def __task_len__(self):
-        return len(self.task_queue)
+        length=0
+        for i in range(self.model_num):
+            length+=len(self.task_queue[i])
+        return length
     
     # 对给定的算法、样本数据、真实参数进行一次评估
-    def eval(self, estiminator, sample_packs,coef_true,s,L,index=None):
+    def eval(self, estiminator, sample_packs,coef_true,s,L,index=None,model_index=None):
         #计时
         start=time.time()
         estiminator.fit(sample_packs,s,L)
@@ -26,32 +32,35 @@ class evaluator:
         SSE=np.sum((coef_true-estiminator.get_params())**2)
         # print(index)
         #将结果输出到result_list中
-        return end-start,SSE,index
+        return end-start,SSE,index,model_index
     
-    def append(self,method,samples_packs,coef_true,s,L,repeat=False):#-?重复的逻辑写错了，以后有缘修改一下
-        if repeat:
-            for i in range(self.repeat_times):
-                self.task_queue.append((method,samples_packs,coef_true,s,L,len(self.task_queue)))
-        else:
-            self.task_queue.append((method,samples_packs,coef_true,s,L,len(self.task_queue)))
+    def append(self,method_list,samples_packs,coef_true,s,L,repeat=False):#-?重复的逻辑写错了，以后有缘修改一下
+        for i in range(self.model_num):
+            if repeat:
+                for j in range(self.repeat_times):
+                    self.task_queue[i].append((method_list[i],samples_packs,coef_true,s,L,len(self.task_queue[i]),i))
+            else:
+                self.task_queue[i].append((method_list[i],samples_packs,coef_true,s,L,len(self.task_queue[i]),i))
 
     def run(self,max_workers=1):
         #多线程，线程数为cpu核心数
         import multiprocessing
-        pool=multiprocessing.Pool(max_workers)
-        self.result_list=[None]*len(self.task_queue)
-        for task in self.task_queue:
-            pool.apply_async(self.eval,task,callback=self.callback)
-        pool.close()
-        pool.join()
+        self.result_list=[]
+        for i in range(self.model_num):
+            self.result_list.append([None]*len(self.task_queue[i]))
+            for j in range(1+int(len(self.task_queue[i])/max_workers)):
+                pool=multiprocessing.Pool(max_workers)
+                for task in self.task_queue[i][j*max_workers:(j+1)*max_workers]:
+                    pool.apply_async(self.eval,task,callback=self.callback)
+                pool.close()
+                pool.join()
     
+
     def callback(self,result):
-        times,SSE,index=result
-        self.result_list[index]=SSE
+        times,SSE,index,model_index=result
+        self.result_list[model_index][index]=SSE
         self.count+=1
-        print(str(self.count)+'/'+str(len(self.task_queue)))
+        # print(str(self.count)+'/'+str(self.__task_len__()))
         
     def get_result(self):
         return 0
-
-
