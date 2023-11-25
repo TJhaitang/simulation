@@ -23,6 +23,7 @@ class Trans_lasso(estiminator):
         if L==0:
             L=self.L
         #Step1-划分训练集与测试集
+        lamb=0.01
         model_num=len(samples_packs)-1
         if model_num==0:
             #直接lasso
@@ -69,14 +70,18 @@ class Trans_lasso(estiminator):
             infoX=np.concatenate(infoX)
             infoy=np.concatenate(infoy)
             # print(infoX.shape,infoy.shape)
-            lasso.fit(infoX,infoy)
-            w=lasso.coef_
+            # lasso.fit(infoX,infoy)
+            # w=lasso.coef_
+            #改为使用最小二乘估计-?
+            w=np.linalg.inv(infoX.T.dot(infoX)).dot(infoX.T).dot(infoy)
             assert len(w)==self.n_features
             #第二步，在目标模型上使用lasso估计beta，但惩罚项为beta-w
-            lasso=Lasso(alpha=0.01)
+            # lasso=Lasso(alpha=0.01)
             trainyL=trainy-np.dot(trainX,w)
-            lasso.fit(trainX,trainyL)
-            beta.append(lasso.coef_+w)
+            # lasso.fit(trainX,trainyL)
+            #改为岭回归-?
+            beta_0=np.linalg.inv(trainX.T.dot(trainX)+lamb*np.eye(self.n_features)).dot(trainX.T).dot(trainyL)
+            beta.append(beta_0+w)
         #Step4-使用beta1、beta2、...、betaL进行估计，获得beta
         #选择在测试集上表现最好的beta作为最终的beta
         from sklearn.metrics import mean_squared_error

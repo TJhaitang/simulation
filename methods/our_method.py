@@ -121,6 +121,7 @@ class Our_method(estiminator):
         times.append(time.time()-start_time)
         
         v=np.ones(len(samples_packs)-1)
+        v1=np.ones(len(samples_packs)-1)
         # beta为目标模型的回归系数
         beta=np.zeros(len(samples_packs[0].getX()[0]))
         delta=np.zeros((len(samples_packs)-1,len(samples_packs[0].getX()[0])))
@@ -157,6 +158,9 @@ class Our_method(estiminator):
                 times.append(time.time()-start_time)
             v=np.zeros(len(samples_packs[1:]))
             v[np.argsort(np.linalg.norm(delta,axis=1))[:L]]=1
+            if np.linalg.norm(v-v1)<threshold:#-?除了beta不变之外，加入了v不变的退出条件。实际上这两个退出的效果是一样的（吗？）
+                break
+            v1=v
             if i==0:
                 times.append(time.time()-start_time)
         # 返回beta
