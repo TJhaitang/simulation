@@ -149,9 +149,9 @@ def t32_eval(n_features,s,n_packs,n_samples,h,L):
             pass
         elif i<L+1:
             #delta的前100项为独立同分布的高斯随机变量
-            delta[:100]=np.random.normal(0,h/100,100)
+            delta[:10]=np.random.normal(0,h/100,10)
         else:
-            delta[:100]=np.random.normal(0,2*s/100,100)
+            delta[:10]=np.random.normal(0,2*s/100,10)
         coef=coef_true+delta
         noise_mean = 0
         noise_var = 1
@@ -222,7 +222,7 @@ def t21_eval(n_features,s,n_packs,n_samples,h,L):
             random_list=random.sample(range(n_features),h)
             delta[random_list]=-0.3
         else:
-            random_list=random.sample(range(n_features),2*s)
+            random_list=random.sample(range(n_features),12)
             delta[random_list]=-0.5
         coef=coef_true+delta
         noise_mean = 0
@@ -260,7 +260,7 @@ def t31_eval(n_features,s,n_packs,n_samples,h,L):
             random_list=random.sample(range(n_features),h)
             delta[random_list]=-0.3
         else:
-            random_list=random.sample(range(n_features),2*s)
+            random_list=random.sample(range(n_features),12)
             delta[random_list]=-0.5
         coef=coef_true+delta
         noise_mean = 0

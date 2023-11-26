@@ -158,8 +158,8 @@ class Our_method(estiminator):
                 times.append(time.time()-start_time)
             v=np.zeros(len(samples_packs[1:]))
             v[np.argsort(np.linalg.norm(delta,axis=1))[:L]]=1
-            if np.linalg.norm(v-v1)<threshold:#-?除了beta不变之外，加入了v不变的退出条件。实际上这两个退出的效果是一样的（吗？）
-                break
+            # if np.linalg.norm(v-v1)<threshold:#-?除了beta不变之外，加入了v不变的退出条件。实际上这两个退出的效果是一样的（吗？）
+            #     break
             v1=v
             if i==0:
                 times.append(time.time()-start_time)
