@@ -43,7 +43,7 @@ class Trans_lasso(estiminator):
         #deltak=1/n_k*sum_{i=1}^{n_k}(x_i^T*y_i)-1/|X_0|*sum_{i=1}^{|X_0|}(x_i^T*y_i)
         R=[]
         t_star=20
-        for i in range(len(samples_packs)-1):
+        for i in range(len(samples_packs)-1):#最小二乘估计选择-?
             delta=np.dot(samples_packs[i+1].getX().T,samples_packs[i+1].getY())/len(samples_packs[i+1])-np.dot(trainX.T,trainy)/len(trainX)
             #将delta的绝对值从大到小排序，取前t_star个，其余置零作为新的delta
             delta[np.argsort(np.abs(delta))[:-t_star]]=0

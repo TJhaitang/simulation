@@ -42,18 +42,25 @@ class evaluator:
             else:
                 self.task_queue[i].append((method_list[i],samples_packs,coef_true,s,L,len(self.task_queue[i]),i))
 
-    def run(self,max_workers=1):
+    def run(self,max_workers=1,multi_thread=True):
         #多线程，线程数为cpu核心数
-        import multiprocessing
-        self.result_list=[]
-        for i in range(self.model_num):
-            self.result_list.append([None]*len(self.task_queue[i]))
-            for j in range(1+int(len(self.task_queue[i])/max_workers)):
-                pool=multiprocessing.Pool(max_workers)
-                for task in self.task_queue[i][j*max_workers:(j+1)*max_workers]:
-                    pool.apply_async(self.eval,task,callback=self.callback)
-                pool.close()
-                pool.join()
+        if multi_thread:
+            import multiprocessing
+            self.result_list=[]
+            for i in range(self.model_num):
+                self.result_list.append([None]*len(self.task_queue[i]))
+                for j in range(1+int(len(self.task_queue[i])/max_workers)):
+                    pool=multiprocessing.Pool(max_workers)
+                    for task in self.task_queue[i][j*max_workers:(j+1)*max_workers]:
+                        pool.apply_async(self.eval,task,callback=self.callback)
+                    pool.close()
+                    pool.join()
+        else:
+            self.result_list=[]
+            for i in range(self.model_num):
+                self.result_list.append([None]*len(self.task_queue[i]))
+                for j in range(len(self.task_queue[i])):
+                    self.callback(self.eval(*self.task_queue[i][j]))
     
 
     def callback(self,result):

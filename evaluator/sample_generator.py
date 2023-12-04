@@ -268,3 +268,17 @@ def t31_eval(n_features,s,n_packs,n_samples,h,L):
         X, y = coef_gen(coef, cov, noise_mean, noise_var, n_samples)
         samples_packs.append(samples_pack(X, y))
     return samples_packs,coef_true
+
+def same_eval(n_features,s,n_packs,n_samples,h,L):
+    coef_true = np.zeros(n_features)
+    coef_true[:s] = 0.5
+    samples_packs=[]
+    for i in range(n_packs):
+        cov = np.eye(n_features)
+        delta = np.zeros(n_features)
+        coef=coef_true+delta
+        noise_mean = 0
+        noise_var = 1
+        X, y = coef_gen(coef, cov, noise_mean, noise_var, n_samples)
+        samples_packs.append(samples_pack(X, y))
+    return samples_packs,coef_true

@@ -1,7 +1,13 @@
+from tqdm import tqdm
+import time
+import numpy as np
+import random
+from methods.t_lasso import T_lasso
 from methods.estiminator import estiminator
 import numpy as np
-from sklearn.linear_model import Lasso
+# from sklearn.linear_model import Lasso
 import time
+from tqdm import tqdm
 
 class Our_method(estiminator):
     def __init__(self, n_features=0,s=0,L=0,instance=None):
@@ -70,7 +76,7 @@ class Our_method(estiminator):
             U,sigma,VT=np.linalg.svd(X)
             Lipschitz=sigma[0]*sigma[0]
             # print(Lipschitz)
-            max_iter=1000
+            max_iter=100
             #岭回归结果作为初值
             delta=np.dot(np.linalg.inv(np.dot(X.T,X)+lamb*np.eye(len(X[0]))),np.dot(X.T,y))
             delta2=delta+0
@@ -100,7 +106,7 @@ class Our_method(estiminator):
     # 重复以上两步直到收敛（或达到最大迭代次数）
     # -?没有设置收敛条件，目前仅仅设置了最大迭代次数
     # 输入：samples_packs:样本数据，s:目标模型稀疏度，L:选定的辅助模型个数
-    def fit(self, samples_packs,s=0,L=0):
+    def fit(self, samples_packs,s=0,L=0,coef_list=[]):
         #如果model_num==0,则直接使用目标模型的样本数据进行lasso估计
         if s==0:
             s=self.s
@@ -120,15 +126,13 @@ class Our_method(estiminator):
         times=[]
         times.append(time.time()-start_time)
         
-        # v=np.ones(len(samples_packs)-1)
-        # v1=np.ones(len(samples_packs)-1)
-        v=np.zeros(len(samples_packs)-1)
-        v1=np.zeros(len(samples_packs)-1)
+        v=np.ones(len(samples_packs)-1)
+        v1=np.ones(len(samples_packs)-1)
         # beta为目标模型的回归系数
         beta=np.zeros(len(samples_packs[0].getX()[0]))
         delta=np.zeros((len(samples_packs)-1,len(samples_packs[0].getX()[0])))
         # 迭代求解
-        max_iter=1000
+        max_iter=10
         # 设置算法的退出阈值threshold
         threshold=0.001
         beta1=np.ones(len(samples_packs[0].getX()[0]))
@@ -160,8 +164,8 @@ class Our_method(estiminator):
                 times.append(time.time()-start_time)
             v=np.zeros(len(samples_packs[1:]))
             v[np.argsort(np.linalg.norm(delta,axis=1))[:L]]=1
-            if np.linalg.norm(v-v1)<threshold:#-?除了beta不变之外，加入了v不变的退出条件。实际上这两个退出的效果是一样的（吗？）
-                break
+            # if np.linalg.norm(v-v1)<threshold:#-?除了beta不变之外，加入了v不变的退出条件。实际上这两个退出的效果是一样的（吗？）
+            #     break
             v1=v
             if i==0:
                 times.append(time.time()-start_time)
@@ -171,3 +175,102 @@ class Our_method(estiminator):
         # beta[np.argsort(np.abs(beta))[:-s]] = 0
         self.params=beta
         return beta,delta,v
+
+# 考虑后期以该类模拟不同数据的分布，对取数据加以时间限制等
+class samples_pack:
+    def __init__(self, X, y):
+        self.X = X
+        self.y = y
+    def __len__(self):
+        return len(self.y)
+    def get_n_fretures(self):
+        return len(self.X[0])
+    def __getitem__(self, idx):
+        return self.X[idx], self.y[idx]
+    def getX(self):
+        return self.X
+    def getY(self):
+        return self.y
+
+# 生成样本数据
+#   
+def coef_gen(coef, cov, noise_mean, noise_var, n_samples):
+    # 生成特征
+    X = np.random.multivariate_normal(np.zeros(len(coef)), cov, n_samples)
+    # 生成噪声
+    noise = np.random.normal(noise_mean, noise_var, n_samples)
+    # 生成标签
+    y = np.dot(X, coef) + noise
+    return X, y
+
+def indep_eval(n_features,s,n_packs,n_samples):
+    coef_true = np.zeros(n_features)
+    coef_true[:s] = 0.3
+    samples_packs=[]
+    # 设定超参数：各模型回归系数、特征间的协方差矩阵、噪声的均值与方差
+    # 长度为n_features, 其中前s个为非零回归系数，后n_features-s个为零
+    #生成样本
+    for i in range(n_packs):
+        cov = np.eye(n_features)
+        delta = np.zeros(n_features)
+        #delta=e*i*0.01
+        # delta[:]=0.01*i
+        coef=coef_true+delta
+        noise_mean = 0
+        noise_var = 1
+        X, y = coef_gen(coef, cov, noise_mean, noise_var, n_samples)
+        samples_packs.append(samples_pack(X, y))
+    return samples_packs,coef_true
+
+def t11_eval(n_features,s,n_packs,n_samples,h,L):
+    coef_list=[]
+    coef_true = np.zeros(n_features)
+    coef_true[:s] = 0.3
+    # coef_list.append(coef_true)
+    samples_packs=[]
+    # 设定超参数：各模型回归系数、特征间的协方差矩阵、噪声的均值与方差
+    # 长度为n_features, 其中前s个为非零回归系数，后n_features-s个为零
+    #生成样本
+    for i in range(n_packs):
+        cov = np.eye(n_features)
+        delta = np.zeros(n_features)
+        #在0~n_features之间随机选取h个位置，将其回归系数减0.3
+        if i==0:
+            pass
+        elif i<L+1:
+            random_list=random.sample(range(n_features),h)
+            delta[random_list]=-0.2
+        else:
+            random_list=random.sample(range(n_features),12)
+            delta[random_list]=-0.5
+        coef=coef_true+delta
+        coef_list.append(coef)
+        noise_mean = 0
+        noise_var = 1
+        X, y = coef_gen(coef, cov, noise_mean, noise_var, n_samples)
+        samples_packs.append(samples_pack(X, y))
+    return samples_packs,coef_true,coef_list
+
+
+n_features=16
+n_samples=100
+n_packs=101
+s=16
+model=Our_method(n_features,s,1)
+t_lasso=T_lasso(n_features,s,1)
+
+result_list=[]
+SSE_list=[]
+h=6
+L=16
+sample_packs,coef_true,coef_list=t11_eval(n_features,s,n_packs,n_samples,h,L)
+print("sample packs generated")
+output=model.fit(sample_packs,s,L,coef_list)
+beta,delta,v=output
+SSE=np.linalg.norm(beta-coef_true)
+result_list.append(output)
+lasso_SSE=np.linalg.norm(t_lasso.fit(sample_packs)-coef_true)
+SSE_list.append(SSE)
+print("SSE:",SSE)
+
+
