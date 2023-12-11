@@ -4,6 +4,7 @@ import numpy as np
 import random
 from methods.t_lasso import T_lasso
 from methods.estiminator import estiminator
+from methods.least_square import Least_square
 import numpy as np
 # from sklearn.linear_model import Lasso
 import time
@@ -126,15 +127,15 @@ class Our_method(estiminator):
         times=[]
         times.append(time.time()-start_time)
         
-        v=np.ones(len(samples_packs)-1)
-        v1=np.ones(len(samples_packs)-1)
+        v=np.zeros(len(samples_packs)-1)
+        v1=np.zeros(len(samples_packs)-1)
         # beta为目标模型的回归系数
         beta=np.zeros(len(samples_packs[0].getX()[0]))
         delta=np.zeros((len(samples_packs)-1,len(samples_packs[0].getX()[0])))
         # 迭代求解
-        max_iter=10
+        max_iter=100
         # 设置算法的退出阈值threshold
-        threshold=0.001
+        threshold=0.0001
         beta1=np.ones(len(samples_packs[0].getX()[0]))
         beta2=np.ones(len(samples_packs[0].getX()[0]))
         for i in range(max_iter):
@@ -238,10 +239,10 @@ def t11_eval(n_features,s,n_packs,n_samples,h,L):
         if i==0:
             pass
         elif i<L+1:
-            random_list=random.sample(range(n_features),h)
+            random_list=random.sample(range(n_features),1)
             delta[random_list]=-0.2
         else:
-            random_list=random.sample(range(n_features),12)
+            random_list=random.sample(range(n_features),3)
             delta[random_list]=-0.5
         coef=coef_true+delta
         coef_list.append(coef)
@@ -252,16 +253,16 @@ def t11_eval(n_features,s,n_packs,n_samples,h,L):
     return samples_packs,coef_true,coef_list
 
 
-n_features=16
+n_features=5
 n_samples=100
 n_packs=101
-s=16
+s=5
 model=Our_method(n_features,s,1)
 t_lasso=T_lasso(n_features,s,1)
 
 result_list=[]
 SSE_list=[]
-h=6
+h=2
 L=16
 sample_packs,coef_true,coef_list=t11_eval(n_features,s,n_packs,n_samples,h,L)
 print("sample packs generated")
@@ -270,7 +271,8 @@ beta,delta,v=output
 SSE=np.linalg.norm(beta-coef_true)
 result_list.append(output)
 lasso_SSE=np.linalg.norm(t_lasso.fit(sample_packs)-coef_true)
+least_square_SSE=np.linalg.norm(Least_square(n_features,s,1).fit(sample_packs)-coef_true)
 SSE_list.append(SSE)
-print("SSE:",SSE)
+print("SSE:",SSE,"lasso_SSE:",lasso_SSE,"least_square_SSE:",least_square_SSE)
 
 

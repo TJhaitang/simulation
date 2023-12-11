@@ -35,6 +35,9 @@ class evaluator:
         return end-start,SSE,index,model_index
     
     def append(self,method_list,samples_packs,coef_true,s,L,repeat=False):#-?重复的逻辑写错了，以后有缘修改一下
+        #如果method_list 的类型为dic，则将其转换为list
+        if type(method_list)==dict:
+            method_list=list(method_list.values())
         for i in range(self.model_num):
             if repeat:
                 for j in range(self.repeat_times):
